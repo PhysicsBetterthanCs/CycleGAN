@@ -4,6 +4,7 @@
 ## 什么是[GAN](https://arxiv.org/pdf/1406.2661.pdf)?
 >
 >We propose a new framework for estimating generative models via an adversarial process, in which we simultaneously train two models:   
+<<<<<<< HEAD
 >a generative model G that captures the data distribution, and a discriminative model D that estimates the probability that a sample   
 > came from the training data rather than G.
 > The training procedure for G is to maximize the probability of D making a mistake.  
@@ -31,3 +32,5 @@ cycle
 #### 实现：（constructing！！！）
 借助于带有short cut的feedforward neural network。此结构与VGG-19相比，在更高的层数堆叠下，反而有更少的复杂度和准确性。  
 ![picture](https://production-media.paperswithcode.com/methods/resnet-e1548261477164_2_mD02h5A.png "Residual learning: a building block")
+
+
