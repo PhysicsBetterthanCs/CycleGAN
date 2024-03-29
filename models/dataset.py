@@ -1,13 +1,13 @@
 import glob
-
+from config import  config
 from PIL import Image
 from torch.utils.data import Dataset
 
 
 class MyDataset(Dataset):
     def __init__(self, transform, mode='train'):
-        self.files_A = glob.glob("/kaggle/input/gan-getting-started/monet_jpg/*jpg")
-        self.files_B = glob.glob("/kaggle/input/gan-getting-started/photo_jpg/*jpg")
+        self.files_A = glob.glob(config.MONET_DATA_PATH)
+        self.files_B = glob.glob(config.PHOTOS_DATA_PATH)
         self.transform = transform
         self.len_A = len(self.files_A)
         self.len_B = len(self.files_B)
