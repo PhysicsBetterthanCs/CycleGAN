@@ -27,11 +27,8 @@ cycle
 试想当较浅的model，已经表现的足够好。我们在进一步堆叠**layers**的过程中，
 自然期望能够提高其表现，前文已提及，这无法行得通, 
 那我们便想退而求其次，至少，随着**layers**的堆叠，模型不会变的更差，即什么都不做 **恒等映射（identity mapping)**
-实现$H(x)=x$。但事实上，因为[**Rlelu**](https://zh.wikipedia.org/wiki/%E7%BA%BF%E6%80%A7%E6%95%B4%E6%B5%81%E5%87%BD%E6%95%B0)**即非线性mapping**的存在，原始映射很大程度上是$H(x)=F(x)+x$。为实现**恒等映射**，我们要实现$F(x)=H(x)-x$，这便是**偏差方程**。
-原映射便变为$H(x)=F(x)+x$。而实现残差映射问题要比原映射更为容易，**通过一系列的非线性变换，实现残差为0，显然要比实现恒等映射要容易的多**。  
+实现H(x)=x。但事实上，因为[**Rlelu**](https://zh.wikipedia.org/wiki/%E7%BA%BF%E6%80%A7%E6%95%B4%E6%B5%81%E5%87%BD%E6%95%B0)**即非线性mapping**的存在，原始映射很大程度上是H(x)=F(x)+x。为实现**恒等映射**，我们要实现F(x)=H(x)-x，这便是**偏差方程**。
+原映射便变为H(x)=F(x)+x。而实现残差映射问题要比原映射更为容易，**通过一系列的非线性变换，实现残差为0，显然要比实现恒等映射要容易的多**。  
 #### 实现：（constructing！！！）
 借助于带有short cut的feedforward neural network。此结构与VGG-19相比，在更高的层数堆叠下，反而有更少的复杂度和准确性。  
 ![picture](https://production-media.paperswithcode.com/methods/resnet-e1548261477164_2_mD02h5A.png "Residual learning: a building block")
-$e= mc^2$
-
-
