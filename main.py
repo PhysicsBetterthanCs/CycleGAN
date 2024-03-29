@@ -7,6 +7,7 @@ import tqdm
 import torch
 import numpy as np
 import torch.nn.init as init
+import time
 
 from config import config
 from models import Generator, Discriminator
@@ -52,7 +53,7 @@ class sample_fake(object):
         return ret
 
 
-def train(generator, discriminator):
+def train( ):
     g_mtp = Generator().to(config.DEVICE)
     g_ptm = Generator().to(config.DEVICE)
     d_m = Discriminator().to(config.DEVICE)
@@ -62,13 +63,13 @@ def train(generator, discriminator):
                              lr=config.LEARNING_RATE, betas=(0.5, 0.999))
     d_p_optimizer = optim.Adam(d_p.parameters(), lr=config.LEARNING_RATE, betas=(0.5, 0.999))
     d_m_optimizer = optim.Adam(d_m.parameters(), lr=config.LEARNING_RATE, betas=(0.5, 0.999))
-    d_optimizer = optim.Adam(itertools.chian(d_p.parameters(),d_m.parameters(),
+    d_optimizer = optim.Adam(itertools.chain(d_p.parameters(),d_m.parameters()),
                              lr=config.LEARNING_RATE), betas=(0.5, 0.999))
 
     sample_monet = sample_fake()
-    sample_photo = sample_fake()-
-    gen_lr = lr_sched(config.DECAY_EPOCH, epochs)
-    desc_lr = lr_sched(config.DECAY_EPOCH, epochs)
+    sample_photo = sample_fake()
+    gen_lr = lr_sched(config.DECAY_EPOCH, config.EPOCH)
+    desc_lr = lr_sched(config.DECAY_EPOCH, config.EPOCH)
     gen_lr_sched = torch.optim.lr_scheduler.LambdaLR(g_optimizer, gen_lr.step)
     desc_lr_sched = torch.optim.lr_scheduler.LambdaLR(d_optimizer, desc_lr.step)
     gen_stats = AvgStats()
@@ -96,6 +97,7 @@ def train(generator, discriminator):
         avg_desc_loss = 0.0
 
         for images in loop:
+            start_time = time.time()
             monet = images['A'].to(config.DEVICE)
             photo = images['B'].to(config.DEVICE)
 
@@ -161,23 +163,23 @@ def train(generator, discriminator):
             # Backward
             monet_desc_loss.backward()
             photo_desc_loss.backward()
-            self.adam_desc.step()
+            d_optimizer.step()
 
-            t.set_postfix(gen_loss=total_gen_loss.item(), desc_loss=total_desc_loss.item())
+            loop.set_postfix(gen_loss=total_gen_loss.item(), desc_loss=total_desc_loss.item())
 
         save_dict = {
             'epoch': epoch + 1,
-            'gen_mtp': gan.gen_mtp.state_dict(),
-            'gen_ptm': gan.gen_ptm.state_dict(),
-            'desc_m': gan.desc_m.state_dict(),
-            'desc_p': gan.desc_p.state_dict(),
-            'optimizer_gen': gan.adam_gen.state_dict(),
-            'optimizer_desc': gan.adam_desc.state_dict()
+            'gen_mtp': g_mtp.state_dict(),
+            'gen_ptm': g_ptm.state_dict(),
+            'desc_m': d_m.state_dict(),
+            'desc_p': d_p.state_dict(),
+            'optimizer_gen': g_optimizer.state_dict(),
+            'optimizer_desc':d_optimizer.state_dict()
         }
         save_checkpoint(save_dict, 'current.ckpt')
 
-        avg_gen_loss /= photo_dl.__len__()
-        avg_desc_loss /= photo_dl.__len__()
+        avg_gen_loss /= DataLoader.__len__()
+        avg_desc_loss /= DataLoader.__len__()
         time_req = time.time() - start_time
 
         gen_stats.append(avg_gen_loss, time_req)
@@ -191,15 +193,15 @@ def train(generator, discriminator):
 
 
 class lr_sched():
-    def __init__(self, config.DECAY_EPOCHs=100, total_epochs=200):
-        self.config.DECAY_EPOCHs = config.DECAY_EPOCHs
+    def __init__(self, decay_epochs=100, total_epochs=200):
+        self.decay_epochs = decay_epochs
         self.total_epochs = total_epochs
 
     def step(self, epoch_num):
-        if epoch_num <= self.config.DECAY_EPOCHs:
+        if epoch_num <= self.decay_epochs:
             return 1.0
         else:
-            fract = (epoch_num - self.config.DECAY_EPOCHs)  / (self.total_epochs - self.config.DECAY_EPOCHs)
+            fract = (epoch_num - self.decay_epochs)  / (self.total_epochs - self.decay_epochs)
             return 1.0 - fract
 
 
@@ -227,3 +229,6 @@ def init_weights(net, init_type='normal', gain=0.02):
             init.normal_(m.weight.data, 1.0, gain)
             init.constant_(m.bias.data, 0.0)
     net.apply(init_func)
+
+
+train()
