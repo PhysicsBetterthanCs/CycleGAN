@@ -32,5 +32,6 @@ cycle
 #### 实现：（constructing！！！）
 借助于带有short cut的feedforward neural network。此结构与VGG-19相比，在更高的层数堆叠下，反而有更少的复杂度和准确性。  
 ![picture](https://production-media.paperswithcode.com/methods/resnet-e1548261477164_2_mD02h5A.png "Residual learning: a building block")
+$e= mc^2$
 
 
