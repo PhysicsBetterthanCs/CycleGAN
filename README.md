@@ -1,10 +1,9 @@
-# CycleGAN-PyTorch from scratch
+# CycleGAN-PyTorch from scratch(constructing)
 原论文：[Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks](https://arxiv.org/abs/1703.10593)
 
 ## 什么是[GAN](https://arxiv.org/pdf/1406.2661.pdf)?
 >
->We propose a new framework for estimating generative models via an adversarial process, in which we simultaneously train two models:   
-<<<<<<< HEAD
+>We propose a new framework for estimating generative models via an adversarial process, in which we simultaneously train two models:
 >a generative model G that captures the data distribution, and a discriminative model D that estimates the probability that a sample   
 > came from the training data rather than G.
 > The training procedure for G is to maximize the probability of D making a mistake.  
@@ -17,8 +16,24 @@ cycle
 ## 原论文的代码架构（见[原文](https://arxiv.org/pdf/1406.2661.pdf)附录7.2）
 ### Generator architectures
 架构来源于Johnson et al，对于128*128的图像采用6个**残差块**，对于256*256的图像采用9个**残差块**。
+>Let c7s1-k denote a 7×7 Convolution-InstanceNormReLU layer with k filters and stride 1. dk denotes a 3 × 3
+>Convolution-InstanceNorm-ReLU layer with k filters and
+>stride 2. Reflection padding was used to reduce artifacts.
+Rk denotes a residual block that contains two 3 × 3 convolutional layers with the same number of filters on both
+layer. uk denotes a 3 × 3 fractional-strided-ConvolutionInstanceNorm-ReLU layer with k filters and stride 1
+2
+.
+The network with 6 residual blocks consists of:
+c7s1-64,d128,d256,R256,R256,R256,
+R256,R256,R256,u128,u64,c7s1-3
+
 ### Discriminator architectures
- 
+>Let Ck denote a
+4 × 4 Convolution-InstanceNorm-LeakyReLU layer with k
+filters and stride 2. After the last layer, we apply a convolution to produce a 1-dimensional output. We do not use
+InstanceNorm for the first C64 layer. We use leaky ReLUs
+with a slope of 0.2. The discriminator architecture is:
+C64-C128-C256-C51
 ## 网络中不同Block机制的详细说明
 ### [residual blocks](https://arxiv.org/pdf/1512.03385.pdf)(残差块)：
 #### ResNet的出现:
@@ -31,4 +46,7 @@ cycle
 原映射便变为H(x)=F(x)+x。而实现残差映射问题要比原映射更为容易，**通过一系列的非线性变换，实现残差为0，显然要比实现恒等映射要容易的多**。  
 #### 实现：（constructing！！！）
 借助于带有short cut的feedforward neural network。此结构与VGG-19相比，在更高的层数堆叠下，反而有更少的复杂度和准确性。  
-![picture](https://production-media.paperswithcode.com/methods/resnet-e1548261477164_2_mD02h5A.png "Residual learning: a building block")
+![picture](https://production-media.paperswithcode.com/methods/resnet-e1548261477164_2_mD02h5A.png "Residual learning: a building block")  
+### [Convolution blocks]()(卷积块)：
+
+
