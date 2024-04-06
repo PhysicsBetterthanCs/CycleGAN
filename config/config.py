@@ -1,12 +1,12 @@
 import torch
 
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-EPOCHS = 100
-BATCH_SIZE = 1
-NUM_WORKERS = 4
-LEARNING_RATE = 2e-5
+NUM_EPOCHS = 1
+BATCH_SIZE = 5
+NUM_WORKERS = 0
+LEARNING_RATE = 2e-4
 LMBDA = 10
-COEFFICIENT = 0.5
-DECAY_EPOCH = 0
-MONET_DATA_PATH = "./data/photo_jpg/*jpg"
-PHOTOS_DATA_PATH = "./data/monet_jpg/*jpg"
+ROOT_MONET = "E:\github\CycleGAN\data\monet_jpg"
+ROOT_PHOTO = "E:\github\CycleGAN\data\photo_jpg"
+COEF = 0.5

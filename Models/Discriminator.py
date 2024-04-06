@@ -1,6 +1,5 @@
 from torch import nn
 
-
 class Discriminator(nn.Module):
 
     def __init__(self, in_channel=3):
@@ -17,7 +16,6 @@ class Discriminator(nn.Module):
                 padding=1,
                 activation=None
         ):
-
             layers = nn.ModuleList(
                 [nn.Conv2d(
                     in_channel,
@@ -44,5 +42,4 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, x):
-
         return self.main(x)

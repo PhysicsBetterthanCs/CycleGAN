@@ -1,234 +1,231 @@
-import torchvision.transforms as transforms
-from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
+import torch
 import torch.nn as nn
 import torch.optim as optim
-import itertools
-import tqdm
-import torch
-import numpy as np
-import torch.nn.init as init
-import time
+
+from torchvision import transforms
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from config import config
 from models import Generator, Discriminator
+from models.Discriminator import Discriminator
+from models.Generator import Generator
 from models.dataset import MyDataset
 
 
-def update_req_grad(models, requires_grad=True):
-    for model in models:
-        for param in model.parameters():
-            param.requires_grad = requires_grad
+# CycleGAN架构
+class CycleGAN():
+    def __init__(self):
+        self.avg_g_loss = 0
+        self.avg_d_loss = 0
+
+        self.d_p = Discriminator()
+        self.d_m = Discriminator()
+        self.g_ptm = Generator()
+        self.g_mtp = Generator()
+
+        self.gen_stats = AvgStats()
+        self.desc_stats = AvgStats()
+
+        self.init_models()
+
+        self.opt_disc = optim.Adam(
+            list(self.d_m.parameters()) + list(self.d_p.parameters()),
+            lr=config.LEARNING_RATE,
+            betas=(0.5, 0.999),
+        )
+        self.opt_gen = optim.Adam(
+            list(self.g_ptm.parameters()) + list(self.g_mtp.parameters()),
+            lr=config.LEARNING_RATE,
+            betas=(0.5, 0.999),
+        )
+
+        self.l1 = nn.L1Loss()
+        self.mse = nn.MSELoss()
+
+        self.g_scaler = torch.cuda.amp.GradScaler()
+        self.d_scaler = torch.cuda.amp.GradScaler()
+
+    def init_models(self):
+        self.d_p = self.d_p.to(config.DEVICE)
+        self.d_m = self.d_m.to(config.DEVICE)
+        self.g_ptm = self.g_ptm.to(config.DEVICE)
+        self.g_mtp = self.g_mtp.to(config.DEVICE)
+
+    def train(self, dataset):
+
+        for epoch in range(config.NUM_EPOCHS):
+
+            total_g_loss = 0
+            total_d_loss = 0
+            m_reals = 0
+            m_fakes = 0
+
+            loop = tqdm(dataset, leave=True)
+
+            for idx, (monet, photo) in enumerate(loop):
+                monet = monet.to(config.DEVICE)
+                photo = photo.to(config.DEVICE)
+
+                # Generator loss
+                with torch.cuda.amp.autocast():
+                    self.opt_gen.zero_grad()
+
+                    # identity loss
+                    id_monet = self.g_ptm(monet)
+                    id_photo = self.g_mtp(photo)
+                    id_monet_loss = self.l1(id_monet, monet) * config.LMBDA * config.COEF
+                    id_photo_loss = self.l1(id_photo, photo) * config.LMBDA * config.COEF
+                    id_loss = id_photo_loss + id_monet_loss
+
+                    fake_monet = self.g_ptm(photo)
+                    d_m_fake = self.d_m(fake_monet)
+                    loss_g_m = self.mse(d_m_fake, torch.ones_like(d_m_fake))
+
+                    fake_photo = self.g_mtp(monet)
+                    d_p_fake = self.d_p(fake_photo)
+                    loss_g_p = self.mse(d_p_fake, torch.ones_like(d_p_fake))
+
+                    loss_g = loss_g_m + loss_g_p
+
+                    # cycle loss
+                    cycle_monet = self.g_ptm(fake_photo)
+                    cycle_photo = self.g_mtp(fake_monet)
+                    cycle_photo_loss = self.l1(cycle_photo, photo)
+                    cycle_monet_loss = self.l1(cycle_monet, monet)
+
+                    g_loss = (
+                            loss_g
+                            + cycle_photo_loss * config.LMBDA
+                            + cycle_monet_loss * config.LMBDA
+                            + id_loss
+                    )
+
+                    total_g_loss += g_loss.item()
+
+                # 反向传播
+                self.g_scaler.scale(g_loss).backward()
+                self.g_scaler.step(self.opt_gen)
+                self.g_scaler.update()
+
+                with torch.cuda.amp.autocast():
+                    self.opt_disc.zero_grad()
+
+                    # Discrimator loss
+                    d_m_real = self.d_m(monet)
+                    d_m_fake = self.d_m(fake_monet.detach())
+                    m_reals += d_m_real.mean().item()
+                    m_fakes += d_m_fake.mean().item()
+                    d_m_real_loss = self.mse(d_m_real, torch.ones_like(d_m_real))
+                    d_m_fake_loss = self.mse(d_m_fake, torch.zeros_like(d_m_fake))
+                    d_m_loss = d_m_real_loss + d_m_fake_loss
+
+                    d_p_real = self.d_p(photo)
+                    d_p_fake = self.d_p(fake_photo.detach())
+                    d_p_real_loss = self.mse(d_p_real, torch.ones_like(d_p_real))
+                    d_p_fake_loss = self.mse(d_p_real, torch.zeros_like(d_p_fake))
+                    d_p_loss = d_p_real_loss + d_p_fake_loss
+
+                    d_loss = (d_m_loss + d_p_loss) / 2
+
+                    total_d_loss += d_loss.item()
+
+                self.d_scaler.scale(d_loss).backward()
+                self.d_scaler.step(self.opt_disc)
+                self.d_scaler.update()
+
+                self.avg_d_loss = total_d_loss / dataset.__len__()
+                self.avg_g_loss = total_g_loss / dataset.__len__()
+
+                loop.set_postfix(m_real=m_reals / (idx + 1), m_fake=m_fakes / (idx + 1))
+
+            # 保存weights
+            save_dict = {
+                'epoch': epoch + 1,
+                'g_mtp': self.g_mtp.state_dict(),
+                'g_ptm': self.g_ptm.state_dict(),
+                'd_m': self.d_m.state_dict(),
+                'd_p': self.d_p.state_dict(),
+                'optimizer_gen': self.opt_gen.state_dict(),
+                'optimizer_desc': self.opt_disc.state_dict()
+            }
+
+            # 保存检查点
+            save_checkpoint(save_dict, 'current.ckpt')
+
+            # 输出每个Epoch的loss
+            print("Epoch: (%d) | Generator Loss:%f | Discriminator Loss:%f" % (epoch +
+                                                                               1, self.avg_g_loss, self.avg_d_loss))
+            # 保存至loss字典
+            self.gen_stats.append(self.avg_g_loss)
+            self.desc_stats.append(self.avg_d_loss)
 
 
-def load_checkpoint(ckpt_path, map_location=None):
-    ckpt = torch.load(ckpt_path, map_location=map_location)
-    print(' [*] Loading checkpoint from %s succeed!' % ckpt_path)
-    return ckpt
-
-
-def save_checkpoint(state, save_path):
-    torch.save(state, save_path)
-
-
-class sample_fake(object):
-    def __init__(self, max_imgs=50):
-        self.max_imgs = max_imgs
-        self.cur_img = 0
-        self.imgs = list()
-
-    def __call__(self, imgs):
-        ret = list()
-        for img in imgs:
-            if self.cur_img < self.max_imgs:
-                self.imgs.append(img)
-                ret.append(img)
-                self.cur_img += 1
-            else:
-                if np.random.ranf() > 0.5:
-                    idx = np.random.randint(0, self.max_imgs)
-                    ret.append(self.imgs[idx])
-                    self.imgs[idx] = img
-                else:
-                    ret.append(img)
-        return ret
-
-
-def train( ):
-    g_mtp = Generator().to(config.DEVICE)
-    g_ptm = Generator().to(config.DEVICE)
-    d_m = Discriminator().to(config.DEVICE)
-    d_p = Discriminator().to(config.DEVICE)
-
-    g_optimizer = optim.Adam(itertools.chain(g_mtp.parameters(), g_ptm.parameters()),
-                             lr=config.LEARNING_RATE, betas=(0.5, 0.999))
-    d_p_optimizer = optim.Adam(d_p.parameters(), lr=config.LEARNING_RATE, betas=(0.5, 0.999))
-    d_m_optimizer = optim.Adam(d_m.parameters(), lr=config.LEARNING_RATE, betas=(0.5, 0.999))
-    d_optimizer = optim.Adam(itertools.chain(d_p.parameters(),d_m.parameters()),
-                             lr=config.LEARNING_RATE), betas=(0.5, 0.999))
-
-    sample_monet = sample_fake()
-    sample_photo = sample_fake()
-    gen_lr = lr_sched(config.DECAY_EPOCH, config.EPOCH)
-    desc_lr = lr_sched(config.DECAY_EPOCH, config.EPOCH)
-    gen_lr_sched = torch.optim.lr_scheduler.LambdaLR(g_optimizer, gen_lr.step)
-    desc_lr_sched = torch.optim.lr_scheduler.LambdaLR(d_optimizer, desc_lr.step)
-    gen_stats = AvgStats()
-    desc_stats = AvgStats()
-
-    l1 = nn.L1Loss()
-    mse = nn.MSELoss()
-
-    train_transform = [
-        transforms.ToTensor(),
-        transforms.Normalize(mean=(0.5, 0.5, 0.5),
-                             std=(0.5, 0.5, 0.5))
-    ]
-
-    train_transform = transforms.Compose(train_transform)
-    train_data = MyDataset(train_transform)
-
-    loader = DataLoader(train_data, batch_size=config.BATCH_SIZE, shuffle=True, num_workers=config.NUM_WORKERS)
-
-    loop = tqdm(loader, leave=True)
-
-    for epoch in range(config.EPOCHS):
-
-        avg_gen_loss = 0.0
-        avg_desc_loss = 0.0
-
-        for images in loop:
-            start_time = time.time()
-            monet = images['A'].to(config.DEVICE)
-            photo = images['B'].to(config.DEVICE)
-
-            fake_photo = g_mtp(monet)
-            fake_monet = g_ptm(photo)
-
-            cycle_monet = g_ptm(fake_photo)
-            cycle_photo = g_mtp(fake_monet)
-
-            id_monet = g_ptm(monet)
-            id_photo = g_mtp(photo)
-
-            id_loss_monet = l1(id_monet, monet) * config.LMBDA * config.COEF
-            id_loss_photo = l1(id_photo, photo) * config.LMBDA * config.COEF
-
-            cycle_loss_monet = l1(cycle_monet, monet) * config.LMBDA
-            cycle_loss_photo = l1(cycle_photo, photo) * config.LMBDA
-
-            monet_desc = d_m(fake_monet)
-            photo_desc = d_p(fake_photo)
-
-            real = torch.ones(monet_desc.size()).to(config.DEVICE)
-
-            adv_loss_monet = mse(monet_desc, real)
-            adv_loss_photo = mse(photo_desc, real)
-
-            total_gen_loss = (cycle_loss_monet + adv_loss_monet + cycle_loss_photo + adv_loss_photo + id_loss_monet +
-                              id_loss_photo)
-
-            avg_gen_loss += total_gen_loss.item()
-
-            total_gen_loss.backward()
-            g_optimizer.step()
-
-            update_req_grad([d_m, d_p], True)
-            d_m_optimizer.zero_grad()
-
-            fake_monet = sample_monet([fake_monet.cpu().data.numpy()])[0]
-            fake_photo = sample_photo([fake_photo.cpu().data.numpy()])[0]
-            fake_monet = torch.tensor(fake_monet).to(config.DEVICE)
-            fake_photo = torch.tensor(fake_photo).to(config.DEVICE)
-
-            monet_desc_real = d_m(monet)
-            monet_desc_fake = d_m(fake_monet)
-            photo_desc_real = d_p(photo)
-            photo_desc_fake = d_p(fake_photo)
-
-            real = torch.ones(monet_desc_real.size()).to(config.DEVICE)
-            fake = torch.zeros(monet_desc_fake.size()).to(config.DEVICE)
-
-            # Descriminator losses
-            # --------------------
-            monet_desc_real_loss = mse(monet_desc_real, real)
-            monet_desc_fake_loss = mse(monet_desc_fake, fake)
-            photo_desc_real_loss = mse(photo_desc_real, real)
-            photo_desc_fake_loss = mse(photo_desc_fake, fake)
-
-            monet_desc_loss = (monet_desc_real_loss + monet_desc_fake_loss) / 2
-            photo_desc_loss = (photo_desc_real_loss + photo_desc_fake_loss) / 2
-            total_desc_loss = monet_desc_loss + photo_desc_loss
-            avg_desc_loss += total_desc_loss.item()
-
-            # Backward
-            monet_desc_loss.backward()
-            photo_desc_loss.backward()
-            d_optimizer.step()
-
-            loop.set_postfix(gen_loss=total_gen_loss.item(), desc_loss=total_desc_loss.item())
-
-        save_dict = {
-            'epoch': epoch + 1,
-            'gen_mtp': g_mtp.state_dict(),
-            'gen_ptm': g_ptm.state_dict(),
-            'desc_m': d_m.state_dict(),
-            'desc_p': d_p.state_dict(),
-            'optimizer_gen': g_optimizer.state_dict(),
-            'optimizer_desc':d_optimizer.state_dict()
-        }
-        save_checkpoint(save_dict, 'current.ckpt')
-
-        avg_gen_loss /= DataLoader.__len__()
-        avg_desc_loss /= DataLoader.__len__()
-        time_req = time.time() - start_time
-
-        gen_stats.append(avg_gen_loss, time_req)
-        desc_stats.append(avg_desc_loss, time_req)
-
-        print("Epoch: (%d) | Generator Loss:%f | Discriminator Loss:%f" %
-              (epoch + 1, avg_gen_loss, avg_desc_loss))
-
-        gen_lr_sched.step()
-        desc_lr_sched.step()
-
-
-class lr_sched():
-    def __init__(self, decay_epochs=100, total_epochs=200):
-        self.decay_epochs = decay_epochs
-        self.total_epochs = total_epochs
-
-    def step(self, epoch_num):
-        if epoch_num <= self.decay_epochs:
-            return 1.0
-        else:
-            fract = (epoch_num - self.decay_epochs)  / (self.total_epochs - self.decay_epochs)
-            return 1.0 - fract
-
-
+# 保存loss
 class AvgStats(object):
     def __init__(self):
         self.reset()
 
     def reset(self):
         self.losses = []
-        self.its = []
 
-    def append(self, loss, it):
+    def append(self, loss):
         self.losses.append(loss)
-        self.its.append(it)
 
 
-def init_weights(net, init_type='normal', gain=0.02):
-    def init_func(m):
-        classname = m.__class__.__name__
-        if hasattr(m, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):
-            init.normal_(m.weight.data, 0.0, gain)
-            if hasattr(m, 'bias') and m.bias is not None:
-                init.constant_(m.bias.data, 0.0)
-        elif classname.find('BatchNorm2d') != -1:
-            init.normal_(m.weight.data, 1.0, gain)
-            init.constant_(m.bias.data, 0.0)
-    net.apply(init_func)
+# 保存检查点
+def save_checkpoint(state, save_path):
+    torch.save(state, save_path)
 
 
-train()
+# 对图片进行反归一化处理
+def unnorm(img, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]):
+    for t, m, s in zip(img, mean, std):
+        t.mul_(s).add_(m)
+
+    return img
+
+
+# 加载数据集
+train_data = MyDataset(config.ROOT_MONET, config.ROOT_PHOTO)
+loader = DataLoader(train_data, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS, drop_last=True,
+                    pin_memory=True)
+# 初始化gan
+gan = CycleGAN()
+
+# 初始化weights
+save_dict = {
+    'epoch': 0,
+    'g_mtp': gan.g_mtp.state_dict(),
+    'g_ptm': gan.g_ptm.state_dict(),
+    'd_m': gan.d_m.state_dict(),
+    'd_p': gan.d_p.state_dict(),
+    'optimizer_gen': gan.opt_gen.state_dict(),
+    'optimizer_desc': gan.opt_disc.state_dict()
+}
+
+# 训练
+gan.train(loader)
+
+# 生成loss函数图
+plt.xlabel("Epochs")
+plt.ylabel("Losses")
+plt.plot(gan.gen_stats.losses, 'r', label='Generator Loss')
+plt.plot(gan.desc_stats.losses, 'b', label='Descriminator Loss')
+plt.legend()
+plt.show()
+
+# 重新加载照片数据集，以备生成最终图片
+ph = tqdm(loader, leave=True)
+# %%
+for i, (monet, photo) in enumerate(ph):
+    if i == 10:
+        break
+
+    with torch.no_grad():
+        pred_monet = gan.g_ptm(photo.to("cuda")).cpu().detach()
+    pred_monet = unnorm(pred_monet)
+    trans = transforms.ToPILImage()
+    img = trans(pred_monet[0]).convert("RGB")
+    img.save("./images/" + str(i + 1) + ".jpg")

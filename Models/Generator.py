@@ -1,14 +1,62 @@
 import torch
 import torch.nn as nn
 
-from ConvolutionalBlock import ConvolutionalBlock
-from ResidualBlock import ResidualBlock
+
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channel: int, out_channel=256):
+        super().__init__()
+        self.block = nn.Sequential(
+            ConvolutionalBlock(in_channel, out_channel, is_activation=True, kernel_size=3, padding=1),
+            ConvolutionalBlock(in_channel, out_channel, is_activation=False, kernel_size=3, padding=1),
+        )
+
+    def forward(self, x):
+        return x + self.block(x)
+
+
+class ConvolutionalBlock(nn.Module):
+    def __init__(
+            self,
+            in_channel: int,
+            out_channel: int,
+            kernel_size: int,
+            stride=1,
+            padding=0,
+            is_downsample=True,
+            is_activation=True,
+            out_padding=1,
+            **kwargs
+    ):
+        super().__init__()
+        if is_downsample:
+            self.main = nn.Sequential(
+                nn.Conv2d(in_channel, out_channel, kernel_size=kernel_size, stride=stride, padding=padding, **kwargs),
+                nn.InstanceNorm2d(out_channel),
+            )
+            if is_activation:
+                self.main.append(nn.ReLU(inplace=True))
+            else:
+                self.main.append(nn.Identity())
+        else:
+            self.main = nn.Sequential(
+                nn.ConvTranspose2d(in_channel, out_channel, kernel_size=kernel_size, stride=stride, padding=padding,
+                                   output_padding=out_padding,
+                                   **kwargs),
+                nn.InstanceNorm2d(out_channel)
+            )
+            if is_activation:
+                self.main.append(nn.ReLU(inplace=True))
+            else:
+                self.main.append(nn.Identity())
+
+    def forward(self, x):
+        return self.main(x)
 
 
 class Generator(nn.Module):
     def __init__(
-        self,
-        in_channel=3,
+            self,
+            in_channel=3,
     ):
         super().__init__()
         channel = [64, 128, 256, 128, 64, 3]
@@ -28,9 +76,9 @@ class Generator(nn.Module):
         )
         self.layers_4 = nn.ModuleList(
             [ConvolutionalBlock(channel[2], channel[3], kernel_size=3, stride=2, padding=1, is_downsample=False,
-                                is_activation=True),
+                                is_activation=True, out_padding=1),
              ConvolutionalBlock(channel[3], channel[4], kernel_size=3, stride=2, padding=1, is_downsample=False,
-                                is_activation=True)]
+                                is_activation=True, out_padding=1)]
         )
         self.layers_5 = nn.Sequential(
             nn.Conv2d(channel[4], channel[5], kernel_size=7, stride=1, padding=3, padding_mode="reflect")
