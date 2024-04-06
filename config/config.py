@@ -2,7 +2,7 @@ import torch
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-NUM_EPOCHS = 1
+NUM_EPOCHS = 50
 BATCH_SIZE = 5
 NUM_WORKERS = 0
 LEARNING_RATE = 2e-4

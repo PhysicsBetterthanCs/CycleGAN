@@ -2,9 +2,8 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
-from torchvision import transforms
 from torch.utils.data import DataLoader
+from torchvision import transforms
 from tqdm import tqdm
 
 from config import config
@@ -220,9 +219,6 @@ plt.show()
 ph = tqdm(loader, leave=True)
 # %%
 for i, (monet, photo) in enumerate(ph):
-    if i == 10:
-        break
-
     with torch.no_grad():
         pred_monet = gan.g_ptm(photo.to("cuda")).cpu().detach()
     pred_monet = unnorm(pred_monet)
