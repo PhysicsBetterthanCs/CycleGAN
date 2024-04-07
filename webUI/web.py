@@ -7,7 +7,8 @@ from models.Generator import Generator as gan
 def model_initall():
     checkpoint = torch.load("../current.ckpt")
     model = gan()
-    model = model.load_state_dict(checkpoint["g_ptm"])
+    model.load_state_dict(checkpoint["g_ptm"])
+    model.eval()
     return model
 
 
@@ -15,8 +16,10 @@ model = model_initall()
 
 demo = gr.Interface(
     fn=model,
-    inputs="images",
-    outputs="images"
+    inputs=gr.Image(type="numpy"),
+    outputs=[
+        "image"
+    ]
 )
 
 demo.launch()
