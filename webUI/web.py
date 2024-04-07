@@ -5,7 +5,7 @@ from torchvision.utils import save_image
 
 from models.Generator import Generator as gan
 
-
+# 模型加载权重
 def model_initall():
     checkpoint = torch.load("../current.ckpt")
     model = gan()
@@ -13,10 +13,11 @@ def model_initall():
     model.eval()
     return model
 
-
+# 输出结果图像
 def predict(inputs):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     inputs = transforms.ToPILImage()(inputs)
+    # 图片归一化处理
     transform = transforms.Compose([
         transforms.Resize((256,256)),
         transforms.ToTensor(),
