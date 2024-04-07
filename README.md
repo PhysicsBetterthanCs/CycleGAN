@@ -77,7 +77,8 @@ C64-C128-C256-C51
 ### 损失函数的意义：  
 CycleGAN的关键在于保持它的损失一致性，
 ## 模型部署：  
-该模型带有Web UI接口，可以直接通过
+该模型带有Web UI接口，可以运行web.py访问web UI
+![picturee](./images/webUI.png)
 
 
 
