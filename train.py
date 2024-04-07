@@ -7,7 +7,6 @@ from torchvision import transforms
 from tqdm import tqdm
 
 from config import config
-from models import Generator, Discriminator
 from models.Discriminator import Discriminator
 from models.Generator import Generator
 from models.dataset import MyDataset

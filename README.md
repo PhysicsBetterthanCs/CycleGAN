@@ -1,6 +1,9 @@
 # CycleGAN-PyTorch from scratch(constructing)
 原论文：[Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks](https://arxiv.org/abs/1703.10593)
-
+### 本模型的部分结果集：  
+![picture](./images/57.jpg)![picture](./images/30.jpg)![picture](./images/15.jpg)
+### 本模型的损失函数：  
+![picture](./images/loss.png)
 ## 什么是[GAN](https://arxiv.org/pdf/1406.2661.pdf)?
 >
 >We propose a new framework for estimating generative models via an adversarial process, in which we simultaneously train two models:
@@ -14,7 +17,7 @@
 ## [CycleGAN](https://arxiv.org/pdf/1406.2661.pdf)的优势：
 传统的Domain Adaptation模型，比如[Pix2Pix](https://arxiv.org/abs/1611.07004),要求训练的数据必须成对（Paired）的出现。如下图的图片，图片的主体和位置都是基本一致的，仅仅是图片色调的更改。
 ![picture](https://camo.githubusercontent.com/8b2623f49303b3821fb078c36be9808671987a91a6fa76cd07b97b9f9f76ca89/68747470733a2f2f7068696c6c6970692e6769746875622e696f2f706978327069782f696d616765732f7465617365725f76332e706e67)
-而CycleGAN突破了这一限制，使得风格迁移能够作用到不同主体的图上。如下图的斑马变马，斑马和马的位置有巨大的差异，但CycleGAN仍然能够很好的迁移图片的风格。
+而CycleGAN突破了这一限制，使得风格迁移能够作用到不同主体的图上。如将马变成斑马的过程中，斑马和马的位置可能有巨大的差异，但CycleGAN仍然能够很好的迁移图片的风格。
 ## 原论文的代码架构（见[原文](https://arxiv.org/pdf/1406.2661.pdf)附录7.2）
 ### Generator architectures
 架构来源于Johnson et al，对于128*128的图像采用6个**残差块**，对于256*256的图像采用9个**残差块**。
@@ -60,7 +63,7 @@ C64-C128-C256-C51
 那我们便想退而求其次，至少，随着**layers**的堆叠，模型不会变的更差，即什么都不做 **恒等映射（identity mapping)**
 实现H(x)=x。但事实上，因为[**Rlelu**](https://zh.wikipedia.org/wiki/%E7%BA%BF%E6%80%A7%E6%95%B4%E6%B5%81%E5%87%BD%E6%95%B0)**即非线性mapping**的存在，原始映射很大程度上是H(x)=F(x)+x。为实现**恒等映射**，我们要实现F(x)=H(x)-x，这便是**偏差方程**。
 原映射便变为H(x)=F(x)+x。而实现残差映射问题要比原映射更为容易，**通过一系列的非线性变换，实现残差为0，显然要比实现恒等映射要容易的多**。  
-#### 实现：（constructing！！！）
+#### 实现：  
 借助于带有short cut的feedforward neural network。此结构与VGG-19相比，在更高的层数堆叠下，反而有更少的复杂度和准确性。  
 ![picture](https://production-media.paperswithcode.com/methods/resnet-e1548261477164_2_mD02h5A.png "Residual learning: a building block")  
 ### [Convolution blocks]()(卷积块)：  
@@ -71,6 +74,11 @@ C64-C128-C256-C51
 #### 参数：
 步长(stride)：
 填充(padding)：卷积核遍历的过程中，边缘的像素点往往只经过一次加权处理，而中间的像素点能够加权多次，这会导致边缘特征的丢失。因此，我们认为拓展图像的边界，使其边缘像素点也能够多次加权处理。
-#### 损失函数
+### 损失函数的意义：  
+CycleGAN的关键在于保持它的损失一致性，
+## 模型部署：  
+该模型带有Web UI接口，可以直接通过
+
+
 
 
