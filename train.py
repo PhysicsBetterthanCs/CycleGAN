@@ -7,9 +7,9 @@ from torchvision import transforms
 from tqdm import tqdm
 
 from config import config
-from models.Discriminator import Discriminator
-from models.Generator import Generator
 from models.dataset import MyDataset
+from models.model.discriminator import Discriminator
+from models.model.generator import Generator
 
 
 # CycleGAN架构
@@ -61,6 +61,7 @@ class CycleGAN():
             m_fakes = 0
 
             loop = tqdm(dataset, leave=True)
+
 
             for idx, (monet, photo) in enumerate(loop):
                 monet = monet.to(config.DEVICE)

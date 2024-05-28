@@ -3,7 +3,7 @@ import torch
 from torchvision import transforms
 from torchvision.utils import save_image
 
-from models.Generator import Generator as gan
+from models.model.generator import Generator as gan
 
 # 模型加载权重
 def model_initall():
